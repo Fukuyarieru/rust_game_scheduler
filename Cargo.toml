@@ -1,0 +1,10 @@
+[package]
+name = "rust_game_schedueler"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name= "bevy_physics"
+path="src/lib.rs"
+
+[dependencies]
