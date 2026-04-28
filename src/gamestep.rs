@@ -37,6 +37,7 @@ impl GameStepSystem {
         // }
     }
 
+    // TODO: starting workers should be done in a specified function, not locally here, so can remove first part and just checking for rating instead
     fn delegate(&mut self, work: Work) {
         if let Some(worker) = self
             .workers
@@ -87,6 +88,7 @@ pub struct GameStepSettings {
     pub workers_count: usize,
 }
 
+// TODO: move all things related to worker and work to worker.rs
 pub struct Worker {
     id: usize,
     pub running: Arc<AtomicBool>,
