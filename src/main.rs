@@ -1,6 +1,7 @@
 use crate::gamestep::{GameStepSettings, GameStepSystem};
 
 mod gamestep;
+mod worker;
 
 fn main() {
     let mut system = GameStepSystem::new(GameStepSettings {
