@@ -6,7 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::worker::{self, Work, Worker};
+use crate::worker::{Work, WorkResult, Worker};
 
 pub struct GameStepSystem {
     settings: GameStepSettings,
@@ -16,14 +16,21 @@ pub struct GameStepSystem {
     work_receiver: Receiver<Work>,
     work_giver: Sender<Work>,
     // channel
-    result_receiver: Receiver<(usize, Duration)>,
-    result_sender: Sender<(usize, Duration)>,
+    result_receiver: Receiver<Result<WorkResult, ()>>,
+    result_sender: Sender<Result<WorkResult, ()>>,
 }
 
 impl GameStepSystem {
+    // TODO: implement step waiting/stalling so to satisfy a consistant amount of actions desired
+    // TODO: add WorkResult scoring to also affect every worker's rating, and a rate fixer for during idle times to not have phantom ratings
     pub fn run(&mut self) {
-        let times = self.settings.steps_per_second;
-        let delay_per_step = 1000.0 / times as f32;
+        // let times = self.settings.steps_per_second;
+        match self.settings.steps_per_second {
+            Some(steps) => {
+                let delay_per_step = 1000.0 / steps as f32;
+            }
+            None => {}
+        };
 
         while let Ok(work) = self.work_receiver.recv() {
             self.delegate(work);
@@ -64,7 +71,7 @@ impl GameStepSystem {
         let (w_s, w_r) = channel();
         let (r_s, r_r) = channel();
         for i in 0..settings.workers_count {
-            workers.push(Worker::new(i, r_s.clone()));
+            workers.push(Worker::new(i as u128, r_s.clone()));
         }
         Self {
             settings,
@@ -89,7 +96,7 @@ pub struct GameStep {
 }
 
 pub struct GameStepSettings {
-    pub steps_per_second: usize,
+    pub steps_per_second: Option<usize>,
     pub workers_count: usize,
 }
 

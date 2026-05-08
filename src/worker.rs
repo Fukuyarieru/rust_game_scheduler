@@ -10,43 +10,84 @@ use std::{
 
 use uuid::Uuid;
 pub struct Worker {
-    id: usize,
+    id: u128,
     pub running: Arc<AtomicBool>,
     // passed in and out of work thread
     work_left: Option<Receiver<Work>>,
     _work_sender: Sender<Work>,
     //
     // (id,run duration)
-    work_result_sender: Sender<(usize, Duration)>,
+    work_result_sender: Sender<Result<WorkResult, ()>>,
     //
     thread: Option<JoinHandle<Receiver<Work>>>,
     //
     pub workload_rating: Arc<AtomicUsize>,
 }
-
 pub struct Work {
-    id: usize,
+    id: u128,
     task: Box<dyn FnOnce() + 'static + Send>,
+    trigger: Option<Trigger>,
+}
+pub struct Trigger {
+    sender: Sender<()>,
+    pub receiver: Receiver<()>,
+    timeout: Option<Duration>,
+}
+pub struct WorkResult {
+    id: u128,
+    duration: Duration,
+}
+
+impl Trigger {
+    pub fn sender(&self) -> Sender<()> {
+        self.sender.clone()
+    }
+    pub fn wait(&self) -> Result<(), ()> {
+        if let Some(timeout) = self.timeout {
+            let instant = Instant::now();
+            while timeout < Instant::now().duration_since(instant) {
+                if let Ok(()) = self.receiver.try_recv() {
+                    return Ok(());
+                };
+            }
+            return Err(());
+        } else {
+            while let Ok(_) = self.receiver.recv() {
+                break;
+            }
+        }
+        Ok(())
+    }
 }
 impl Work {
-    pub fn run(self) -> (usize, Duration) {
+    pub fn run(self) -> Result<WorkResult, ()> {
         let i = Instant::now();
+        if let Some(trigger) = self.trigger {
+            match trigger.wait() {
+                Ok(_) => {}
+                Err(_) => return Err(()),
+            };
+        }
         (self.task)();
-        (self.id, i.elapsed())
+        Ok(WorkResult {
+            id: self.id,
+            duration: i.elapsed(),
+        })
     }
-    pub fn new(task: Box<dyn FnOnce() + 'static + Send>) -> Self {
+    pub fn new(task: Box<dyn FnOnce() + 'static + Send>, trigger: Option<Trigger>) -> Self {
         Self {
-            id: Uuid::new_v4().as_u128() as usize,
+            id: Uuid::new_v4().as_u128(),
             task: task,
+            trigger,
         }
     }
-    pub fn id(&self) -> usize {
+    pub fn id(&self) -> u128 {
         self.id
     }
 }
 
 impl Worker {
-    pub fn new(id: usize, work_result_sender: Sender<(usize, Duration)>) -> Self {
+    pub fn new(id: u128, work_result_sender: Sender<Result<WorkResult, ()>>) -> Self {
         let (s, r) = channel();
         Self {
             id,
@@ -85,7 +126,7 @@ impl Worker {
         let r = self.thread.take().unwrap().join().unwrap();
         self.work_left = Some(r);
     }
-    pub fn id(&self) -> usize {
+    pub fn id(&self) -> u128 {
         self.id
     }
 }
