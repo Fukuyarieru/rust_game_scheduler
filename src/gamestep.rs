@@ -6,7 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::worker::{Work, Worker};
+use crate::worker::{self, Work, Worker};
 
 pub struct GameStepSystem {
     settings: GameStepSettings,
@@ -51,7 +51,12 @@ impl GameStepSystem {
             .min_by_key(|worker| worker.workload_rating.load(SeqCst))
             .unwrap();
         #[cfg(debug_assertions)]
-        println!("given worker {} work num {}", worker.id(), work.id());
+        println!(
+            "given worker {} work num {}, queue size {}",
+            worker.id(),
+            work.id(),
+            worker.workload_rating.load(SeqCst)
+        );
         worker.add(work);
     }
     pub fn new(settings: GameStepSettings) -> Self {
