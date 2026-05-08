@@ -6,7 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::worker::{Work, WorkResult, Worker};
+use crate::worker::{self, Work, WorkResult, Worker};
 
 pub struct GameStepSystem {
     settings: GameStepSettings,
@@ -18,6 +18,14 @@ pub struct GameStepSystem {
     // channel
     result_receiver: Receiver<Result<WorkResult, ()>>,
     result_sender: Sender<Result<WorkResult, ()>>,
+    //
+    signal_sender: Sender<GameStepSignal>,
+    signal_receiver: Receiver<GameStepSignal>,
+}
+
+pub enum GameStepSignal {
+    FullyUsed,
+    Idle,
 }
 
 impl GameStepSystem {
@@ -65,11 +73,30 @@ impl GameStepSystem {
             worker.workload_rating.load(SeqCst)
         );
         worker.add(work);
+        self.signal_appropriatly();
     }
+
+    pub fn signal_appropriatly(&self) {
+        if self
+            .workers
+            .iter()
+            .all(|worker| worker.running.load(SeqCst))
+        {
+            self.signal_sender.send(GameStepSignal::FullyUsed);
+        } else if self
+            .workers
+            .iter()
+            .all(|worker| !worker.running.load(SeqCst))
+        {
+            self.signal_sender.send(GameStepSignal::Idle);
+        }
+    }
+
     pub fn new(settings: GameStepSettings) -> Self {
         let mut workers = Vec::new();
         let (w_s, w_r) = channel();
         let (r_s, r_r) = channel();
+        let (s_s, s_r) = channel();
         for i in 0..settings.workers_count {
             workers.push(Worker::new(i as u128, r_s.clone()));
         }
@@ -81,6 +108,8 @@ impl GameStepSystem {
             result_receiver: r_r,
             result_sender: r_s,
             workers,
+            signal_receiver: s_r,
+            signal_sender: s_s,
         }
     }
     pub fn work_giver(&self) -> Sender<Work> {
