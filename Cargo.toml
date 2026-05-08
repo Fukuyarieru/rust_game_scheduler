@@ -8,6 +8,7 @@ name= "rust_game_schedueler"
 path="src/lib.rs"
 
 [dependencies]
+rand = "0.10.1"
 uuid = {version="1.23.1",features= ["v4"]}
 
 [[bin]]
