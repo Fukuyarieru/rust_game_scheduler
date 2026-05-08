@@ -25,7 +25,9 @@ impl GameStepSystem {
         let times = self.settings.steps_per_second;
         let delay_per_step = 1000.0 / times as f32;
 
-        while let Ok(work) = self.work_receiver.recv() {}
+        while let Ok(work) = self.work_receiver.recv() {
+            self.delegate(work);
+        }
 
         // loop {
         //     for i in 0..times {
@@ -35,19 +37,22 @@ impl GameStepSystem {
         //     }
         // }
     }
-    fn start_idle_workers(&mut self) {
-        _ = self.workers.iter_mut().map(|worker| {
-            (!worker.running.load(SeqCst)).then(|| {
+    pub fn start_idle_workers(&mut self) {
+        for worker in self.workers.iter_mut() {
+            if !worker.running.load(SeqCst) {
                 worker.start_working();
-            })
-        });
+            }
+        }
     }
     fn delegate(&mut self, work: Work) {
-        self.workers
+        let worker = self
+            .workers
             .iter_mut()
             .min_by_key(|worker| worker.workload_rating.load(SeqCst))
-            .unwrap()
-            .add(work);
+            .unwrap();
+        #[cfg(debug_assertions)]
+        println!("given worker {} work num {}", worker.id(), work.id());
+        worker.add(work);
     }
     pub fn new(settings: GameStepSettings) -> Self {
         let mut workers = Vec::new();

@@ -1,5 +1,4 @@
 use std::{
-    ops::{AddAssign, SubAssign},
     sync::{
         Arc,
         atomic::{AtomicBool, AtomicUsize, Ordering::SeqCst},
@@ -8,6 +7,8 @@ use std::{
     thread::JoinHandle,
     time::{Duration, Instant},
 };
+
+use uuid::Uuid;
 pub struct Worker {
     id: usize,
     pub running: Arc<AtomicBool>,
@@ -33,6 +34,15 @@ impl Work {
         (self.task)();
         (self.id, i.elapsed())
     }
+    pub fn new(task: Box<dyn FnOnce() + 'static + Send>) -> Self {
+        Self {
+            id: Uuid::new_v4().as_u128() as usize,
+            task: task,
+        }
+    }
+    pub fn id(&self) -> usize {
+        self.id
+    }
 }
 
 impl Worker {
@@ -50,9 +60,11 @@ impl Worker {
     }
     pub fn add(&mut self, work: Work) {
         self._work_sender.send(work).unwrap();
-        self.workload_rating.load(SeqCst).add_assign(1);
+        self.workload_rating.fetch_add(1, SeqCst);
     }
     pub fn start_working(&mut self) {
+        self.running.store(true, SeqCst);
+
         let running = self.running.clone();
         let r = self.work_left.take().unwrap();
         let result_sender = self.work_result_sender.clone();
@@ -63,7 +75,7 @@ impl Worker {
             {
                 let result = work.run();
                 result_sender.send(result).unwrap();
-                rating.load(SeqCst).sub_assign(1);
+                rating.fetch_sub(1, SeqCst);
             }
             r
         }));
