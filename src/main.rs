@@ -20,8 +20,9 @@ fn main() {
         for _ in 0..125 {
             let new_work = Work::new(
                 Box::new(move || {
-                    println!("{}", counter);
-                    thread::sleep(Duration::from_secs(rand::random_range(1..=4)));
+                    let rand = rand::random_range(1..=9);
+                    println!("{}, waited {} seconds", counter, rand);
+                    thread::sleep(Duration::from_secs(rand));
                 }),
                 None,
             );
