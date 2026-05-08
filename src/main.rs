@@ -11,7 +11,7 @@ mod worker;
 fn main() {
     let mut system = GameStepSystem::new(GameStepSettings {
         workers_count: 10,
-        steps_per_second: Some(4),
+        steps_per_second_limit: Some(4),
     });
     system.start_idle_workers();
     let work_giver = system.work_giver();
