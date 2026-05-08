@@ -25,7 +25,7 @@ impl GameStepSystem {
     // TODO: add WorkResult scoring to also affect every worker's rating, and a rate fixer for during idle times to not have phantom ratings
     pub fn run(&mut self) {
         // let times = self.settings.steps_per_second;
-        match self.settings.steps_per_second {
+        match self.settings.steps_per_second_limit {
             Some(steps) => {
                 let delay_per_step = 1000.0 / steps as f32;
             }
@@ -96,7 +96,7 @@ pub struct GameStep {
 }
 
 pub struct GameStepSettings {
-    pub steps_per_second: Option<usize>,
+    pub steps_per_second_limit: Option<usize>,
     pub workers_count: usize,
 }
 
