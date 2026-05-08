@@ -4,7 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [lib]
-name= "bevy_physics"
+name= "rust_game_schedueler"
 path="src/lib.rs"
 
 [dependencies]
+uuid = {version="1.23.1",features= ["v4"]}
+
+[[bin]]
+name = "rust_game_schedueler"
+path = "src/main.rs"
