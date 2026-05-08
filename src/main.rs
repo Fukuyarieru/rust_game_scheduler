@@ -10,21 +10,21 @@ mod worker;
 
 fn main() {
     let mut system = GameStepSystem::new(GameStepSettings {
-        workers_count: 4,
+        workers_count: 40,
         steps_per_second: 4,
     });
     system.start_idle_workers();
     let work_giver = system.work_giver();
     thread::spawn(move || {
         let mut counter = 0;
-        loop {
+        for _ in 0..500 {
             let new_work = Work::new(Box::new(move || {
                 println!("{}", counter);
-                thread::sleep(Duration::from_secs(2));
+                thread::sleep(Duration::from_secs(rand::random_range(1..=7)));
             }));
             _ = work_giver.send(new_work);
             counter += 1;
-            thread::sleep(Duration::from_millis(100));
+            thread::sleep(Duration::from_millis(25));
             // thread::sleep(Duration::from_secs(1));
         }
     });
