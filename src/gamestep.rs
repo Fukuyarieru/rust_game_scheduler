@@ -6,15 +6,15 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::worker::{self, Work, WorkResult, Worker};
+use crate::worker::{Job, WorkResult, Worker};
 
 pub struct GameStepSystem {
     settings: GameStepSettings,
     last_step: GameStep,
     workers: Vec<Worker>,
-    // work delagation
-    work_receiver: Receiver<Work>,
-    work_giver: Sender<Work>,
+    // job delagation
+    work_receiver: Receiver<Job>,
+    work_giver: Sender<Job>,
     // channel
     result_receiver: Receiver<Result<WorkResult, ()>>,
     result_sender: Sender<Result<WorkResult, ()>>,
@@ -40,8 +40,11 @@ impl GameStepSystem {
             None => {}
         };
 
-        while let Ok(work) = self.work_receiver.recv() {
-            self.delegate(work);
+        while let Ok(job) = self.work_receiver.recv() {
+            self.delegate(job);
+            self.last_step = self.last_step.next();
+            #[cfg(debug_assertions)]
+            println!("{:?}", self.last_step)
         }
 
         // loop {
@@ -59,7 +62,7 @@ impl GameStepSystem {
             }
         }
     }
-    fn delegate(&mut self, work: Work) {
+    fn delegate(&mut self, job: Job) {
         let worker = self
             .workers
             .iter_mut()
@@ -67,15 +70,18 @@ impl GameStepSystem {
             .unwrap();
         #[cfg(debug_assertions)]
         println!(
-            "given worker {} work num {}, queue size {}",
+            "given worker {} job num {}, queue size {}",
             worker.id(),
-            work.id(),
+            job.id(),
             worker.workload_rating.load(SeqCst)
         );
-        worker.add(work);
+        worker.add(job);
         self.signal_appropriatly();
     }
 
+    fn mass_delegate(&mut self, jobs: &[Job]) {
+        todo!()
+    }
     pub fn signal_appropriatly(&self) {
         if self
             .workers
@@ -112,7 +118,7 @@ impl GameStepSystem {
             signal_sender: s_s,
         }
     }
-    pub fn work_giver(&self) -> Sender<Work> {
+    pub fn work_giver(&self) -> Sender<Job> {
         self.work_giver.clone()
     }
 }
