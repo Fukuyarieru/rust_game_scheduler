@@ -8,9 +8,9 @@ use std::{
 
 use crate::worker::{Job, WorkResult, Worker};
 
-pub struct GameStepSystem {
-    settings: GameStepSettings,
-    last_step: GameStep,
+pub struct StepSystem {
+    settings: StepSystemSettings,
+    last_step: Step,
     workers: Vec<Worker>,
     // job delagation
     work_receiver: Receiver<Job>,
@@ -28,7 +28,7 @@ pub enum GameStepSignal {
     Idle,
 }
 
-impl GameStepSystem {
+impl StepSystem {
     // TODO: implement step waiting/stalling so to satisfy a consistant amount of actions desired
     // TODO: add WorkResult scoring to also affect every worker's rating, and a rate fixer for during idle times to not have phantom ratings
     pub fn run(&mut self) {
@@ -98,7 +98,7 @@ impl GameStepSystem {
         }
     }
 
-    pub fn new(settings: GameStepSettings) -> Self {
+    pub fn new(settings: StepSystemSettings) -> Self {
         let mut workers = Vec::new();
         let (w_s, w_r) = channel();
         let (r_s, r_r) = channel();
@@ -108,7 +108,7 @@ impl GameStepSystem {
         }
         Self {
             settings,
-            last_step: GameStep::new(),
+            last_step: Step::new(),
             work_receiver: w_r,
             work_giver: w_s,
             result_receiver: r_r,
@@ -124,18 +124,18 @@ impl GameStepSystem {
 }
 
 #[derive(Debug)]
-pub struct GameStep {
+pub struct Step {
     pub step_num: usize,
     pub time: Instant,
     pub difference: Duration,
 }
 
-pub struct GameStepSettings {
+pub struct StepSystemSettings {
     pub steps_per_second_limit: Option<usize>,
     pub workers_count: usize,
 }
 
-impl GameStep {
+impl Step {
     pub fn next(&mut self) -> Self {
         let now = Instant::now();
         let dt = now.duration_since(self.time);

@@ -1,3 +1,4 @@
+use crate::trigger::Trigger;
 use std::{
     sync::{
         Arc,
@@ -12,7 +13,7 @@ use uuid::Uuid;
 pub struct Worker {
     id: u128,
     pub running: Arc<AtomicBool>,
-    // passed in and out of work thread
+    // passed in and out of job thread
     work_left: Option<Receiver<Job>>,
     _work_sender: Sender<Job>,
     //
@@ -31,55 +32,31 @@ pub struct Job {
     task: Box<dyn FnOnce() + 'static + Send>,
     trigger: Option<Trigger>,
 }
-/// Condition which will be checked and looped untill fired
-pub struct Trigger {
-    trigger_fire: Sender<()>,
-    pub trigger_listener: Receiver<()>,
-    /// Time limit for wait loop
-    timeout: Option<Duration>,
-}
 
 pub struct WorkResult {
     /// Uuid
     id: u128,
-    /// Time took for the work to complete
-    duration: Duration,
+    /// Time took for the job to complete
+    total_duration: Duration,
+    ///
+    wait_duration: Duration,
 }
 
-impl Trigger {
-    pub fn sender(&self) -> Sender<()> {
-        self.trigger_fire.clone()
-    }
-    pub fn wait(&self) -> Result<(), ()> {
-        if let Some(timeout) = self.timeout {
-            let instant = Instant::now();
-            while timeout < Instant::now().duration_since(instant) {
-                if let Ok(()) = self.trigger_listener.try_recv() {
-                    return Ok(());
-                };
-            }
-            return Err(());
-        } else {
-            while let Ok(_) = self.trigger_listener.recv() {
-                break;
-            }
-        }
-        Ok(())
-    }
-}
 impl Job {
     pub fn run(self) -> Result<WorkResult, ()> {
         let i = Instant::now();
         if let Some(trigger) = self.trigger {
-            match trigger.wait() {
+            match trigger.check() {
                 Ok(_) => {}
                 Err(_) => return Err(()),
             };
         }
+        let wait_duration = i.elapsed();
         (self.task)();
         Ok(WorkResult {
             id: self.id,
-            duration: i.elapsed(),
+            total_duration: i.elapsed(),
+            wait_duration,
         })
     }
     pub fn new(task: Box<dyn FnOnce() + 'static + Send>, trigger: Option<Trigger>) -> Self {
@@ -107,9 +84,9 @@ impl Worker {
             workload_rating: Arc::new(AtomicUsize::new(0)),
         }
     }
-    pub fn add(&mut self, work: Job) -> Result<(), SendError<Job>> {
+    pub fn add(&mut self, job: Job) -> Result<(), SendError<Job>> {
         self.workload_rating.fetch_add(1, SeqCst);
-        self._work_sender.send(work)
+        self._work_sender.send(job)
     }
     pub fn start_working(&mut self) {
         self.running.store(true, SeqCst);
@@ -119,10 +96,10 @@ impl Worker {
         let result_sender = self.work_result_sender.clone();
         let rating = self.workload_rating.clone();
         self.thread = Some(std::thread::spawn(move || {
-            while let Ok(work) = r.recv()
-                && running.load(SeqCst)
+            while running.load(SeqCst)
+                && let Ok(job) = r.recv()
             {
-                let result = work.run();
+                let result = job.run();
                 result_sender.send(result).unwrap();
                 rating.fetch_sub(1, SeqCst);
             }

@@ -10,8 +10,10 @@ use crate::{
     worker::Job,
 };
 
-mod gamestep;
+mod step;
+mod trigger;
 mod worker;
+mod worker_pool;
 
 fn main() {
     let mut system = GameStepSystem::new(GameStepSettings {
