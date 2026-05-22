@@ -38,7 +38,7 @@ pub struct WorkResult {
     id: u128,
     /// Time took for the job to complete
     total_duration: Duration,
-    ///
+    /// Time waited for a trigger
     wait_duration: Duration,
 }
 

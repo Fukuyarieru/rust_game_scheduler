@@ -6,25 +6,26 @@ use std::{
 };
 
 use crate::{
-    gamestep::{GameStepSettings, GameStepSystem},
+    step_system::{StepSystem, StepSystemSettings},
     worker::Job,
 };
 
-mod step;
+mod step_system;
 mod trigger;
 mod worker;
 mod worker_pool;
 
 fn main() {
-    let mut system = GameStepSystem::new(GameStepSettings {
+    let mut system = StepSystem::new(StepSystemSettings {
         workers_count: 30,
         steps_per_second_limit: Some(4),
     });
-    system.start_idle_workers();
-    let work_giver = system.work_giver();
+    system.worker_pool.change_all_workers_running_status(true);
+    let work_giver = system.worker_pool.work_giver();
     let job_senders = amount_of_jobs_senders(work_giver, 10, 100, 0..3);
 
     system.run();
+    loop {}
 }
 
 fn amount_of_jobs_senders(

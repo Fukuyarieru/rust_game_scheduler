@@ -1,12 +1,12 @@
 use std::{
-    sync::mpsc::{Receiver, Sender},
+    sync::mpsc::{Receiver, Sender, channel},
     time::{Duration, Instant},
 };
 
 /// Condition which will be checked and looped untill fired
 pub struct Trigger {
     trigger_fire: Sender<()>,
-    pub trigger_listener: Receiver<()>,
+    trigger_listener: Receiver<()>,
     /// Time limit for wait loop
     timeout: Option<Duration>,
 }
@@ -14,6 +14,17 @@ pub struct Trigger {
 struct Fire(Sender<()>);
 
 impl Trigger {
+    pub fn new(timeout: Option<Duration>) -> (Self, Fire) {
+        let (s, r) = channel();
+        (
+            Self {
+                trigger_fire: s.clone(),
+                trigger_listener: r,
+                timeout,
+            },
+            Fire(s),
+        )
+    }
     pub fn fire(&self) -> Fire {
         Fire(self.trigger_fire.clone())
     }

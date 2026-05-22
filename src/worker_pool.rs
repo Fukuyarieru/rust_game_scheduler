@@ -16,7 +16,7 @@ pub struct WorkerPool {
     work_receiver: Option<Receiver<Job>>,
     work_giver: Sender<Job>,
     // channel
-    result_receiver: Receiver<Result<WorkResult, ()>>,
+    pub result_receiver: Receiver<Result<WorkResult, ()>>,
     result_sender: Sender<Result<WorkResult, ()>>,
     // active
     active: Arc<AtomicBool>,
@@ -31,9 +31,6 @@ impl WorkerPool {
         for i in 0..worker_count {
             workers.push(Worker::new(i as u128, r_s.clone()));
         }
-
-        let active = Arc::new(AtomicBool::new(false));
-        let active_clone = active.clone();
 
         Self {
             workers: Some(workers),
@@ -65,7 +62,7 @@ impl WorkerPool {
                     job.id(),
                     worker.workload_rating.load(SeqCst)
                 );
-                worker.add(job);
+                _ = worker.add(job);
             }
             (receiver, workers)
         }));
@@ -80,5 +77,23 @@ impl WorkerPool {
     }
     pub fn work_giver(&self) -> Sender<Job> {
         self.work_giver.clone()
+    }
+    /// MUST BE DONE WHILE ON "OFF" MODE
+    pub fn worker_running_status(&self, idx: usize) -> bool {
+        self.workers.as_ref().unwrap()[idx].running.load(SeqCst)
+    }
+    /// MUST BE DONE WHILE ON "OFF" MODE
+    pub fn change_worker_running_status(&self, idx: usize, state: bool) {
+        self.workers.as_ref().unwrap()[idx]
+            .running
+            .store(state, SeqCst);
+    }
+    /// MUST BE DONE WHILE ON "OFF" MODE
+    pub fn change_all_workers_running_status(&self, state: bool) {
+        self.workers
+            .as_ref()
+            .unwrap()
+            .iter()
+            .for_each(|worker| worker.running.store(state, SeqCst));
     }
 }
