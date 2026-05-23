@@ -59,7 +59,7 @@ impl WorkerPool {
                 println!(
                     "given worker {} job num {}, queue size {}",
                     worker.id(),
-                    job.id(),
+                    job.work_id(),
                     worker.workload_rating.load(SeqCst)
                 );
                 _ = worker.add(job);
@@ -80,20 +80,22 @@ impl WorkerPool {
     }
     /// MUST BE DONE WHILE ON "OFF" MODE
     pub fn worker_running_status(&self, idx: usize) -> bool {
-        self.workers.as_ref().unwrap()[idx].running.load(SeqCst)
+        self.workers.as_ref().unwrap()[idx].get_running_state()
     }
     /// MUST BE DONE WHILE ON "OFF" MODE
-    pub fn change_worker_running_status(&self, idx: usize, state: bool) {
-        self.workers.as_ref().unwrap()[idx]
-            .running
-            .store(state, SeqCst);
+    pub fn change_worker_running_status(&mut self, idx: usize, state: bool) {
+        if state {
+            self.workers.as_mut().unwrap()[idx].start_working();
+        } else {
+            self.workers.as_mut().unwrap()[idx].stop_working();
+        };
     }
     /// MUST BE DONE WHILE ON "OFF" MODE
-    pub fn change_all_workers_running_status(&self, state: bool) {
+    pub fn change_all_workers_running_status(&mut self, state: bool) {
         self.workers
-            .as_ref()
+            .as_mut()
             .unwrap()
-            .iter()
-            .for_each(|worker| worker.running.store(state, SeqCst));
+            .iter_mut()
+            .for_each(|worker| worker.start_working());
     }
 }

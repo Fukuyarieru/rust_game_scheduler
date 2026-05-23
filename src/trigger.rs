@@ -28,7 +28,7 @@ impl Trigger {
     pub fn fire(&self) -> Fire {
         Fire(self.trigger_fire.clone())
     }
-    pub fn check(&self) -> Result<(), ()> {
+    pub fn wait(&self) -> Result<(), ()> {
         if let Some(timeout) = self.timeout {
             let instant = Instant::now();
             while timeout < Instant::now().duration_since(instant) {
@@ -44,6 +44,9 @@ impl Trigger {
         }
         Ok(())
     }
+    // pub fn check(&self) -> Result<(), ()> {
+    //     self.trigger_listener.try_recv()
+    // }
 }
 
 impl Fire {

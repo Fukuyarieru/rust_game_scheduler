@@ -17,12 +17,13 @@ mod worker_pool;
 
 fn main() {
     let mut system = StepSystem::new(StepSystemSettings {
-        workers_count: 30,
+        workers_count: 100,
         steps_per_second_limit: Some(4),
     });
     system.worker_pool.change_all_workers_running_status(true);
+    system.worker_pool.on();
     let work_giver = system.worker_pool.work_giver();
-    let job_senders = amount_of_jobs_senders(work_giver, 10, 100, 0..3);
+    let job_senders = amount_of_jobs_senders(work_giver, 100, 100, 0..10);
 
     system.run();
     loop {}
@@ -59,7 +60,10 @@ fn give_jobs_thread(
             let new_work = Job::new(
                 Box::new(move || {
                     let delay = rand::random_range(wait_range_clone);
-                    println!("[{}] | {}, waited {} seconds", thread_id, counter, delay);
+                    println!(
+                        "[thread id: {}] | counter: {}, waited {} seconds",
+                        thread_id, counter, delay
+                    );
                     thread::sleep(Duration::from_secs(delay));
                 }),
                 None,

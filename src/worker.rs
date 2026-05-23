@@ -12,12 +12,11 @@ use uuid::Uuid;
 
 pub struct Worker {
     id: u128,
-    pub running: Arc<AtomicBool>,
+    running: Arc<AtomicBool>,
     // passed in and out of job thread
     work_left: Option<Receiver<Job>>,
     _work_sender: Sender<Job>,
     //
-    // (id,run duration)
     work_result_sender: Sender<Result<WorkResult, ()>>,
     //
     thread: Option<JoinHandle<Receiver<Job>>>,
@@ -34,8 +33,9 @@ pub struct Job {
 }
 
 pub struct WorkResult {
+    worker_id: u128,
     /// Uuid
-    id: u128,
+    work_id: u128,
     /// Time took for the job to complete
     total_duration: Duration,
     /// Time waited for a trigger
@@ -43,10 +43,10 @@ pub struct WorkResult {
 }
 
 impl Job {
-    pub fn run(self) -> Result<WorkResult, ()> {
+    pub fn run(self, worker_id: u128) -> Result<WorkResult, ()> {
         let i = Instant::now();
         if let Some(trigger) = self.trigger {
-            match trigger.check() {
+            match trigger.wait() {
                 Ok(_) => {}
                 Err(_) => return Err(()),
             };
@@ -54,7 +54,8 @@ impl Job {
         let wait_duration = i.elapsed();
         (self.task)();
         Ok(WorkResult {
-            id: self.id,
+            worker_id,
+            work_id: self.id,
             total_duration: i.elapsed(),
             wait_duration,
         })
@@ -66,7 +67,7 @@ impl Job {
             trigger,
         }
     }
-    pub fn id(&self) -> u128 {
+    pub fn work_id(&self) -> u128 {
         self.id
     }
 }
@@ -90,6 +91,7 @@ impl Worker {
     }
     pub fn start_working(&mut self) {
         self.running.store(true, SeqCst);
+        let worker_id = self.id;
 
         let running = self.running.clone();
         let r = self.work_left.take().unwrap();
@@ -99,7 +101,7 @@ impl Worker {
             while running.load(SeqCst)
                 && let Ok(job) = r.recv()
             {
-                let result = job.run();
+                let result = job.run(worker_id);
                 result_sender.send(result).unwrap();
                 rating.fetch_sub(1, SeqCst);
             }
@@ -110,6 +112,9 @@ impl Worker {
         self.running.store(false, SeqCst);
         let r = self.thread.take().unwrap().join().unwrap();
         self.work_left = Some(r);
+    }
+    pub fn get_running_state(&self) -> bool {
+        self.running.load(SeqCst)
     }
     pub fn id(&self) -> u128 {
         self.id
