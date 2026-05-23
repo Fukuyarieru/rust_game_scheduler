@@ -26,7 +26,6 @@ fn main() {
     let job_senders = amount_of_jobs_senders(work_giver, 3, 100, 0..=0);
 
     system.run();
-    loop {}
 }
 
 fn amount_of_jobs_senders(

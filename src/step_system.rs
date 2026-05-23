@@ -50,6 +50,7 @@ impl StepSystem {
         self.active.store(true, SeqCst);
 
         let delay = if let Some(amount) = self.settings.steps_per_second_limit {
+            // TODO: PROBLEM HERE
             Some(Duration::from_millis((100.0 / amount as f64) as u64 * 1000))
         } else {
             None
@@ -63,6 +64,7 @@ impl StepSystem {
             println!("{:?}", self.last_step);
             if let Some(delay) = delay {
                 println!("WAITING {:?}", delay);
+                // TODO: NEED TO FIX DELAY
                 thread::sleep(delay);
             }
         }
