@@ -1,29 +1,35 @@
 use std::{
     sync::{
-        atomic::Ordering::SeqCst,
+        Arc,
+        atomic::{AtomicBool, Ordering::SeqCst},
         mpsc::{Receiver, Sender, channel},
     },
+    thread,
     time::{Duration, Instant},
 };
 
 use crate::{
-    worker::{Job, WorkResult, Worker},
+    worker::{Job, JobResult, Worker},
     worker_pool::WorkerPool,
 };
 
 pub struct StepSystem {
-    settings: StepSystemSettings,
+    pub settings: StepSystemSettings,
     last_step: Step,
 
-    pub worker_pool: WorkerPool,
+    worker_pool: WorkerPool,
 
+    job_giver: Sender<Job>,
+    job_receiver: Receiver<Job>,
+    result_receiver: Receiver<JobResult>,
+    active: Arc<AtomicBool>,
     // workers: Vec<Worker>,
     // // job delagation
     // work_receiver: Receiver<Job>,
     // work_giver: Sender<Job>,
     // channel
-    result_receiver: Receiver<Result<WorkResult, ()>>,
-    result_sender: Sender<Result<WorkResult, ()>>,
+    // result_receiver: Receiver<Result<WorkResult, ()>>,
+    // result_sender: Sender<Result<WorkResult, ()>>,
     // //
     // signal_sender: Sender<GameStepSignal>,
     // signal_receiver: Receiver<GameStepSignal>,
@@ -38,20 +44,28 @@ impl StepSystem {
     // TODO: implement step waiting/stalling so to satisfy a consistant amount of actions desired
     // TODO: add WorkResult scoring to also affect every worker's rating, and a rate fixer for during idle times to not have phantom ratings
     pub fn run(&mut self) {
-        // let times = self.settings.steps_per_second;
-        match self.settings.steps_per_second_limit {
-            Some(steps) => {
-                let delay_per_step = 1000.0 / steps as f32;
-            }
-            None => {}
+        self.worker_pool.change_all_workers_running_status(true);
+        self.worker_pool.on();
+
+        self.active.store(true, SeqCst);
+
+        let delay = if let Some(amount) = self.settings.steps_per_second_limit {
+            Some(Duration::from_millis((100.0 / amount as f64) as u64 * 1000))
+        } else {
+            None
         };
 
-        // while let Ok(job) = self.work_receiver.recv() {
-        //     self.delegate(job);
-        //     self.last_step = self.last_step.next();
-        //     #[cfg(debug_assertions)]
-        //     println!("{:?}", self.last_step)
-        // }
+        while self.active.load(SeqCst)
+            && let Ok(job) = self.job_receiver.recv()
+        {
+            self.delegate(job);
+            self.last_step = self.last_step.next();
+            println!("{:?}", self.last_step);
+            if let Some(delay) = delay {
+                println!("WAITING {:?}", delay);
+                thread::sleep(delay);
+            }
+        }
 
         // loop {
         //     for i in 0..times {
@@ -60,6 +74,10 @@ impl StepSystem {
         //         std::thread::sleep(Duration::from_millis(delay_per_step as u64));
         //     }
         // }
+    }
+
+    pub fn job_giver(&self) -> Sender<Job> {
+        self.job_giver.clone()
     }
     // pub fn start_idle_workers(&mut self) {
     //     for worker in self.workers.iter_mut() {
@@ -84,6 +102,11 @@ impl StepSystem {
     //     worker.add(job);
     //     self.signal_appropriatly();
     // }
+
+    pub fn delegate(&mut self, job: Job) {
+        // CLONES CONSTANTLY
+        _ = self.worker_pool.job_giver.send(job);
+    }
 
     // fn mass_delegate(&mut self, jobs: &[Job]) {
     //     todo!()
@@ -112,14 +135,20 @@ impl StepSystem {
         // for i in 0..settings.workers_count {
         //     workers.push(Worker::new(i as u128, r_s.clone()));
         // }
+
+        let (j_s, j_r) = channel();
+
+        let worker_pool = WorkerPool::new(settings.workers_count);
+
         Self {
-            worker_pool: WorkerPool::new(settings.workers_count.clone()),
+            worker_pool,
             settings,
+            job_giver: j_s,
+            job_receiver: j_r,
             last_step: Step::new(),
-            // work_receiver: w_r,
-            // work_giver: w_s,
             result_receiver: r_r,
-            result_sender: r_s,
+            // result_sender: r_s,
+            active: Arc::new(AtomicBool::new(false)),
             // workers,
             // signal_receiver: s_r,
             // signal_sender: s_s,

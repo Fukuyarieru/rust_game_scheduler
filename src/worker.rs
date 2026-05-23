@@ -17,7 +17,7 @@ pub struct Worker {
     work_left: Option<Receiver<Job>>,
     _work_sender: Sender<Job>,
     //
-    work_result_sender: Sender<Result<WorkResult, ()>>,
+    work_result_sender: Sender<Result<JobResult, ()>>,
     //
     thread: Option<JoinHandle<Receiver<Job>>>,
     //
@@ -32,7 +32,7 @@ pub struct Job {
     trigger: Option<Trigger>,
 }
 
-pub struct WorkResult {
+pub struct JobResult {
     worker_id: u128,
     /// Uuid
     work_id: u128,
@@ -43,7 +43,7 @@ pub struct WorkResult {
 }
 
 impl Job {
-    pub fn run(self, worker_id: u128) -> Result<WorkResult, ()> {
+    pub fn run(self, worker_id: u128) -> Result<JobResult, ()> {
         let i = Instant::now();
         if let Some(trigger) = self.trigger {
             match trigger.wait() {
@@ -53,7 +53,7 @@ impl Job {
         }
         let wait_duration = i.elapsed();
         (self.task)();
-        Ok(WorkResult {
+        Ok(JobResult {
             worker_id,
             work_id: self.id,
             total_duration: i.elapsed(),
@@ -73,7 +73,7 @@ impl Job {
 }
 
 impl Worker {
-    pub fn new(id: u128, work_result_sender: Sender<Result<WorkResult, ()>>) -> Self {
+    pub fn new(id: u128, work_result_sender: Sender<Result<JobResult, ()>>) -> Self {
         let (s, r) = channel();
         Self {
             id,

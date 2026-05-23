@@ -8,16 +8,16 @@ use std::{
     thread::{JoinHandle, spawn},
 };
 
-use crate::worker::{Job, WorkResult, Worker};
+use crate::worker::{Job, JobResult, Worker};
 
 pub struct WorkerPool {
     workers: Option<Vec<Worker>>,
     // job delagation
     work_receiver: Option<Receiver<Job>>,
-    work_giver: Sender<Job>,
+    pub job_giver: Sender<Job>,
     // channel
-    pub result_receiver: Receiver<Result<WorkResult, ()>>,
-    result_sender: Sender<Result<WorkResult, ()>>,
+    pub result_receiver: Receiver<Result<JobResult, ()>>,
+    result_sender: Sender<Result<JobResult, ()>>,
     // active
     active: Arc<AtomicBool>,
     delegator: Option<JoinHandle<(Receiver<Job>, Vec<Worker>)>>,
@@ -35,7 +35,7 @@ impl WorkerPool {
         Self {
             workers: Some(workers),
             work_receiver: Some(w_r),
-            work_giver: w_s,
+            job_giver: w_s,
             result_receiver: r_r,
             result_sender: r_s,
             active: Arc::new(AtomicBool::new(false)),
@@ -75,9 +75,9 @@ impl WorkerPool {
         self.work_receiver = Some(receiver);
         self.workers = Some(workers);
     }
-    pub fn work_giver(&self) -> Sender<Job> {
-        self.work_giver.clone()
-    }
+    // pub fn work_giver(&self) -> Sender<Job> {
+    //     self.work_giver.clone()
+    // }
     /// MUST BE DONE WHILE ON "OFF" MODE
     pub fn worker_running_status(&self, idx: usize) -> bool {
         self.workers.as_ref().unwrap()[idx].get_running_state()
